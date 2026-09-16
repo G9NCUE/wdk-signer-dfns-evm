@@ -35,13 +35,13 @@ describe('DfnsSignerEvm, derivable root on a master key', () => {
     assert.throws(() => new DfnsSignerEvm({ client, masterKeyId: 'k' }), /network/)
   })
 
-  it('uses non-hardened paths under 44/60', () => {
+  it('uses non-hardened paths under m/44/60', () => {
     assert.equal(signer.isDerivable, true)
-    assert.equal(signer.path, '44/60/0/0/0')
+    assert.equal(signer.path, 'm/44/60/0/0/0')
     assert.equal(signer.index, 0)
     assert.equal(signer.address, undefined)
     const s = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: NETWORK, path: "0'/0/3" })
-    assert.equal(s.path, '44/60/0/0/3')
+    assert.equal(s.path, 'm/44/60/0/0/3')
   })
 
   it('creates the derived wallet on first getAddress, then finds it again by path', async () => {
@@ -129,7 +129,7 @@ describe('DfnsSignerEvm inside wdk-wallet-evm', () => {
     const account = await manager.getAccount(2)
     assert.ok(account instanceof WalletAccountEvm)
     assert.equal(await account.getAddress(), local('0/0/2').address)
-    assert.equal(account.path, '44/60/0/0/2')
+    assert.equal(account.path, 'm/44/60/0/0/2')
     const sig = await account.sign('from the manager')
     assert.equal(verifyMessage('from the manager', sig), local('0/0/2').address)
     manager.dispose()

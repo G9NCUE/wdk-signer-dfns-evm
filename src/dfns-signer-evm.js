@@ -3,8 +3,15 @@
 import { ISigner, InvalidSignerError, ValueError } from '@tetherto/wdk-wallet'
 import { Signature, Transaction, TypedDataEncoder, getAddress, getBytes, hexlify, toUtf8Bytes } from 'ethers'
 
-const PATH_PREFIX = '44/60'
+const PATH_PREFIX = 'm/44/60'
 const DEFAULT_PATH = '0/0/0'
+
+// paths are reported in full with the m/ prefix, as wdk-wallet-evm's seed signer does on the
+// universal-signer branch; derive() accepts "0'/0/1", "44'/60'/0'/0/1" or "m/44'/60'/0'/0/1",
+// and Dfns only derives non-hardened paths, so hardened markers are dropped
+function fullPath (path) {
+  return `${PATH_PREFIX}/${path.replace(/^m\//, '').replace(/^44'?\/60'?\//, '').replace(/'/g, '')}`
+}
 
 // Follows the ISignerEvm contract by shape: wdk-wallet-evm beta.18 does not export the class.
 // Two modes: { walletId } binds one Dfns wallet and cannot derive; { masterKeyId, network } is a
@@ -19,8 +26,7 @@ export default class DfnsSignerEvm extends ISigner {
     this._walletId = walletId
     this._masterKeyId = masterKeyId
     this._network = network
-    // Dfns only derives non-hardened paths, so hardened markers are dropped
-    this._path = walletId ? undefined : `${PATH_PREFIX}/${path.replace(/'/g, '')}`
+    this._path = walletId ? undefined : fullPath(path)
     this._isChild = isChild
     this._address = undefined
     this._publicKey = null
@@ -103,7 +109,7 @@ export default class DfnsSignerEvm extends ISigner {
   // Dfns rejects a duplicate derivation path instead of returning the existing wallet,
   // and wallets do not expose their path; the derived key does, under store.derivationPath.
   async _findOrCreateWallet () {
-    const path = `m/${this._path}`
+    const path = this._path
     try {
       return await this._client.wallets.createWallet({
         body: { network: this._network, name: `wdk ${path}`, signingKey: { deriveFrom: { keyId: this._masterKeyId, path } } }
