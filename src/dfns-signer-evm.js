@@ -18,11 +18,13 @@ function fullPath (path) {
 // derivable root, each child is a Dfns wallet derived from the master key at a non-hardened path.
 export default class DfnsSignerEvm extends ISigner {
   // client is a DfnsApiClient from @dfns/sdk with a credential signer
-  constructor ({ client, walletId, masterKeyId, network, path = DEFAULT_PATH, isChild = false } = {}) {
+  // lifecycle is shared by reference between a root and the children it derives
+  constructor ({ client, walletId, masterKeyId, network, path = DEFAULT_PATH, isChild = false, lifecycle } = {}) {
     super()
     if (!client) throw new ValueError('A Dfns API client is required.')
     if (!walletId && !(masterKeyId && network)) throw new ValueError('Pass a walletId, or a masterKeyId and a network.')
     this._client = client
+    this._lifecycle = lifecycle ?? { disposed: false }
     this._walletId = walletId
     this._masterKeyId = masterKeyId
     this._network = network
@@ -46,15 +48,14 @@ export default class DfnsSignerEvm extends ISigner {
 
   async derive (relPath) {
     if (!this.isDerivable) throw new InvalidSignerError('Cannot derive: this signer is bound to one wallet or is a derived child.')
-    return new DfnsSignerEvm({ client: this._client, masterKeyId: this._masterKeyId, network: this._network, path: relPath, isChild: true })
+    return new DfnsSignerEvm({ client: this._live(), masterKeyId: this._masterKeyId, network: this._network, path: relPath, isChild: true, lifecycle: this._lifecycle })
   }
 
   async getAddress () {
     if (this._address) return this._address
-    if (!this._client) throw new InvalidSignerError('The signer has been disposed.')
 
     const wallet = this._walletId
-      ? await this._client.wallets.getWallet({ walletId: this._walletId })
+      ? await this._live().wallets.getWallet({ walletId: this._walletId })
       : await this._findOrCreateWallet()
     this._walletId = wallet.id
     this._address = getAddress(wallet.address)
@@ -90,13 +91,20 @@ export default class DfnsSignerEvm extends ISigner {
     return { ...populated, signature: Signature.from(signature.encoded) }
   }
 
+  // disposing the root ends every child derived from it, as WalletManagerEvm.dispose expects
   dispose () {
+    this._lifecycle.disposed = true
     this._client = undefined
     this._publicKey = null
   }
 
+  _live () {
+    if (this._lifecycle.disposed || !this._client) throw new InvalidSignerError('The signer has been disposed.')
+    return this._client
+  }
+
   async _sign (body) {
-    const res = await this._client.wallets.generateSignature({ walletId: await this._walletIdResolved(), body })
+    const res = await this._live().wallets.generateSignature({ walletId: await this._walletIdResolved(), body })
     if (res.status !== 'Signed') throw new InvalidSignerError(`Dfns did not sign (status ${res.status}${res.reason ? ': ' + res.reason : ''}).`)
     return res
   }
@@ -111,18 +119,18 @@ export default class DfnsSignerEvm extends ISigner {
   async _findOrCreateWallet () {
     const path = this._path
     try {
-      return await this._client.wallets.createWallet({
+      return await this._live().wallets.createWallet({
         body: { network: this._network, name: `wdk ${path}`, signingKey: { deriveFrom: { keyId: this._masterKeyId, path } } }
       })
     } catch (e) {
       if (!/duplicate derivation path/i.test(e.message)) throw e
     }
-    const { items } = await this._client.keys.listKeys({})
+    const { items } = await this._live().keys.listKeys({})
     for (const k of items.filter(k => !k.masterKey)) {
-      const key = await this._client.keys.getKey({ keyId: k.id })
+      const key = await this._live().keys.getKey({ keyId: k.id })
       if (key.store?.derivationPath !== path) continue
       const w = key.wallets?.find(w => w.network === this._network)
-      if (w) return this._client.wallets.getWallet({ walletId: w.id })
+      if (w) return this._live().wallets.getWallet({ walletId: w.id })
     }
     throw new InvalidSignerError(`No ${this._network} wallet found at ${path} on master key ${this._masterKeyId}.`)
   }

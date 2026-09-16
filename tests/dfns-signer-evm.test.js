@@ -106,6 +106,15 @@ describe('DfnsSignerEvm, derivable root on a master key', () => {
     s.dispose()
     await assert.rejects(s.getAddress(), /disposed/)
   })
+
+  it('disposing the root ends the children derived from it', async () => {
+    const root = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: NETWORK })
+    const child = await root.derive('0/0/1')
+    await child.sign('alive')
+    root.dispose()
+    await assert.rejects(child.sign('dead'), /disposed/)
+    await assert.rejects(root.derive('0/0/2'), /disposed/)
+  })
 })
 
 describe('DfnsSignerEvm bound to one wallet', () => {

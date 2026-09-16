@@ -33,7 +33,8 @@ await wallet.getAccount('treasury')
 ```
 
 Dfns only derives non-hardened paths, so the WDK path `0'/0/0` becomes `m/44/60/0/0/0` on the Dfns
-side and the signer reports `44/60/0/0/0`. `account.keyPair.privateKey` is always `null`.
+side and the signer reports that full path. Disposing the root signer ends every account derived
+from it, since the WDK manager only disposes accounts that hold a private key. `account.keyPair.privateKey` is always `null`.
 
 ## What goes to Dfns
 
