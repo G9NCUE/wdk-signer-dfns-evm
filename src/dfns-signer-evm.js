@@ -82,8 +82,8 @@ export default class DfnsSignerEvm extends ISigner {
   // ethers first: bigint values (a 7702 user operation's nonce and gas fields) become decimal strings
   // the Dfns SDK can serialise, and the domain's chain id is sent as a number.
   async signTypedData ({ domain, types, message }) {
-    const payload = TypedDataEncoder.getPayload(domain, types, message)
-    const { EIP712Domain, ...rest } = payload.types
+    const { EIP712Domain, ...rest } = types // ethers wants the domain struct out of types, Dfns too
+    const payload = TypedDataEncoder.getPayload(domain, rest, message)
     const dfnsDomain = { ...payload.domain }
     if (dfnsDomain.chainId !== undefined) dfnsDomain.chainId = Number(dfnsDomain.chainId)
     const { signature } = await this._sign({ kind: 'Eip712', types: rest, domain: dfnsDomain, message: payload.message })

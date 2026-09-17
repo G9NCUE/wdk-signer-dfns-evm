@@ -107,6 +107,15 @@ describe('DfnsSignerEvm, derivable root on a master key', () => {
     await assert.rejects(s.getAddress(), /disposed/)
   })
 
+  it('tolerates an EIP712Domain entry in types', async () => {
+    const s = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: NETWORK })
+    const address = await s.getAddress()
+    const domain = { name: 'WDK', version: '1', chainId: 11155111, verifyingContract: address }
+    const types = { EIP712Domain: [{ name: 'name', type: 'string' }], T: [{ name: 'x', type: 'uint8' }] }
+    const sig = await s.signTypedData({ domain, types, message: { x: 7 } })
+    assert.equal(verifyTypedData(domain, { T: types.T }, { x: 7 }, sig), address)
+  })
+
   it('signs typed data whose message holds bigints, as a 7702 user operation does', async () => {
     const s = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: NETWORK })
     const address = await s.getAddress()
