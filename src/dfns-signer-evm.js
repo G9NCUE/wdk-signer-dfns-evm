@@ -78,10 +78,15 @@ export default class DfnsSignerEvm extends ISigner {
     return signedData
   }
 
-  // Dfns infers the primary type and rejects an EIP712Domain entry in types
+  // Dfns infers the primary type and rejects an EIP712Domain entry in types. The payload goes through
+  // ethers first: bigint values (a 7702 user operation's nonce and gas fields) become decimal strings
+  // the Dfns SDK can serialise, and the domain's chain id is sent as a number.
   async signTypedData ({ domain, types, message }) {
-    const { EIP712Domain, ...rest } = TypedDataEncoder.getPayload(domain, types, message).types
-    const { signature } = await this._sign({ kind: 'Eip712', types: rest, domain, message })
+    const payload = TypedDataEncoder.getPayload(domain, types, message)
+    const { EIP712Domain, ...rest } = payload.types
+    const dfnsDomain = { ...payload.domain }
+    if (dfnsDomain.chainId !== undefined) dfnsDomain.chainId = Number(dfnsDomain.chainId)
+    const { signature } = await this._sign({ kind: 'Eip712', types: rest, domain: dfnsDomain, message: payload.message })
     return signature.encoded
   }
 

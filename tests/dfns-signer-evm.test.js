@@ -107,6 +107,19 @@ describe('DfnsSignerEvm, derivable root on a master key', () => {
     await assert.rejects(s.getAddress(), /disposed/)
   })
 
+  it('signs typed data whose message holds bigints, as a 7702 user operation does', async () => {
+    const s = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: NETWORK })
+    const address = await s.getAddress()
+    const typed = {
+      domain: { name: 'WDK', version: '1', chainId: 42161n, verifyingContract: address },
+      types: { Op: [{ name: 'nonce', type: 'uint256' }, { name: 'gas', type: 'uint128' }, { name: 'to', type: 'address' }] },
+      message: { nonce: 2n ** 70n, gas: 21000n, to: address }
+    }
+    // the fake serialises the body like the SDK does, a bigint would throw here
+    const sig = await s.signTypedData(typed)
+    assert.equal(verifyTypedData(typed.domain, typed.types, typed.message, sig), address)
+  })
+
   it('a second network reuses the derived key, same address, one wallet per network', async () => {
     const sepolia = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: NETWORK })
     const arbitrum = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: 'ArbitrumOne' })

@@ -31,6 +31,7 @@ export class FakeDfnsClient {
     }
     this.wallets.generateSignature = async ({ walletId, body }) => {
       self.calls.push('generateSignature:' + body.kind)
+      JSON.stringify(body) // the SDK serialises the body: a bigint anywhere in it throws, as in production
       const w = self.wallets.find(w => w.id === walletId)
       const node = self.keys.find(k => k.id === w.signingKey.id)._node
       const sig = (digest) => { const s = node.signingKey.sign(digest); return { r: s.r, s: s.s, recid: s.yParity, encoded: s.serialized } }
