@@ -80,6 +80,10 @@ The demo prints the address to fund.
   so the signer lists keys to find an existing wallet.
 - `createWallet` returns the address and the compressed public key in one go, no second call.
 - Dfns rejects an `EIP712Domain` entry in `types` and infers the primary type. Turnkey accepts it.
+- Typed data must be JSON-safe before the Dfns SDK serialises it: the 7702 gasless module signs a user
+  operation whose message holds BigInt values, and `JSON.stringify` throws on them. The signer runs the
+  data through ethers' `TypedDataEncoder.getPayload` first (strings for values, a number for the chain
+  id). Filed as [issue #42](https://github.com/tetherto/wdk-wallet-evm-7702-gasless/issues/42) on the module.
 - Addresses come back lower-case. The signer checksums them so they compare equal with what ethers
   recovers.
 - Same as with Turnkey: `wdk-wallet-evm` beta.18 does not export `ISignerEvm`, so this extends the
