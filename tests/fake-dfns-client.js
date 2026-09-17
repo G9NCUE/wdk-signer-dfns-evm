@@ -17,10 +17,16 @@ export class FakeDfnsClient {
       self.calls.push('createWallet')
       const path = body.signingKey?.deriveFrom?.path
       if (path && self.keys.some(k => k.store?.derivationPath === path)) throw new Error('duplicate derivation path')
-      const node = path ? self.root.derivePath(path.slice(2)) : HDNodeWallet.createRandom()
-      const key = { id: `key-${++n}`, masterKey: false, publicKey: node.publicKey.slice(2), store: { derivationPath: path }, wallets: [], _node: node }
-      const wallet = { id: `wa-${n}`, network: body.network, address: node.address.toLowerCase(), status: 'Active', signingKey: { id: key.id, publicKey: key.publicKey } }
-      key.wallets.push({ id: wallet.id, network: wallet.network }); self.keys.push(key); self.wallets.push(wallet)
+      // signingKey.id reuses an existing key on another network, same address (Keys:Reuse)
+      let key = body.signingKey?.id ? self.keys.find(k => k.id === body.signingKey.id) : null
+      if (body.signingKey?.id && !key) throw new Error('key not found')
+      if (!key) {
+        const node = path ? self.root.derivePath(path.slice(2)) : HDNodeWallet.createRandom()
+        key = { id: `key-${++n}`, masterKey: false, publicKey: node.publicKey.slice(2), store: { derivationPath: path }, wallets: [], _node: node }
+        self.keys.push(key)
+      } else { n++ }
+      const wallet = { id: `wa-${n}`, network: body.network, address: key._node.address.toLowerCase(), status: 'Active', signingKey: { id: key.id, publicKey: key.publicKey } }
+      key.wallets.push({ id: wallet.id, network: wallet.network }); self.wallets.push(wallet)
       return wallet
     }
     this.wallets.generateSignature = async ({ walletId, body }) => {

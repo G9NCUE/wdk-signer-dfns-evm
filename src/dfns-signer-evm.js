@@ -125,12 +125,15 @@ export default class DfnsSignerEvm extends ISigner {
     } catch (e) {
       if (!/duplicate derivation path/i.test(e.message)) throw e
     }
+    // the path is taken: find its derived key, reuse its wallet on this network, or create one on the
+    // same key (signingKey.id, needs the Keys:Reuse permission), which keeps the address across EVM chains
     const { items } = await this._live().keys.listKeys({})
     for (const k of items.filter(k => !k.masterKey)) {
       const key = await this._live().keys.getKey({ keyId: k.id })
       if (key.store?.derivationPath !== path) continue
       const w = key.wallets?.find(w => w.network === this._network)
       if (w) return this._live().wallets.getWallet({ walletId: w.id })
+      return this._live().wallets.createWallet({ body: { network: this._network, name: `wdk ${path}`, signingKey: { id: key.id } } })
     }
     throw new InvalidSignerError(`No ${this._network} wallet found at ${path} on master key ${this._masterKeyId}.`)
   }

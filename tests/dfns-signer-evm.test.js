@@ -107,6 +107,18 @@ describe('DfnsSignerEvm, derivable root on a master key', () => {
     await assert.rejects(s.getAddress(), /disposed/)
   })
 
+  it('a second network reuses the derived key, same address, one wallet per network', async () => {
+    const sepolia = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: NETWORK })
+    const arbitrum = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: 'ArbitrumOne' })
+    const a = await sepolia.getAddress()
+    const b = await arbitrum.getAddress()
+    assert.equal(a, b)
+    const keys = client.keys.filter(k => k.store?.derivationPath === 'm/44/60/0/0/0')
+    assert.equal(keys.length, 1, 'one derived key for the path')
+    assert.deepEqual(keys[0].wallets.map(w => w.network).sort(), ['ArbitrumOne', NETWORK].sort())
+    assert.equal(verifyMessage('arb', await arbitrum.sign('arb')), a)
+  })
+
   it('disposing the root ends the children derived from it', async () => {
     const root = new DfnsSignerEvm({ client, masterKeyId: 'key-master', network: NETWORK })
     const child = await root.derive('0/0/1')
